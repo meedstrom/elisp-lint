@@ -380,6 +380,12 @@ Use a file variable or \".dir-locals.el\" to override the default value."
           "$")
   "This regexp must match a URL in comments or strings.")
 
+(defvar elisp-lint--ignore-fill-re
+  ";+[[:blank:]]*<elisp-lint-ignore-fill>[[:blank:]]*$")
+
+(defvar elisp-lint--resume-fill-re
+  ";+[[:blank:]]*<elisp-lint-resume-fill>[[:blank:]]*$")
+
 (defun elisp-lint--fill-column ()
   "Confirm buffer has no lines exceeding `fill-column' in length.
 Use a file variable or \".dir-locals.el\" to override the default
@@ -405,14 +411,20 @@ have unlimited length:
         (let ((text (buffer-substring-no-properties
                      (line-beginning-position)
                      (line-end-position))))
-          (when
-              (and (not (string-match elisp-lint--package-summary-regexp text))
-                   (not (string-match elisp-lint--package-requires-regexp text))
-                   (not (string-match elisp-lint--url-in-document-regexp text))
-                   (> (length text) fill-column))
-            (push (list line-number 0 'fill-column
-                        (format "line length %s exceeded" fill-column))
-                  too-long-lines)))
+          (if (string-match-p elisp-lint--ignore-fill-re text)
+              (let ((start (point))
+                    (end (progn
+                           (re-search-forward elisp-lint--resume-fill-re nil :move)
+                           (point))))
+                (setq line-number (+ line-number (count-matches "\n" start end))))
+            (when
+                (and (not (string-match elisp-lint--package-summary-regexp text))
+                     (not (string-match elisp-lint--package-requires-regexp text))
+                     (not (string-match elisp-lint--url-in-document-regexp text))
+                     (> (length text) fill-column))
+              (push (list line-number 0 'fill-column
+                          (format "line length %s exceeded" fill-column))
+                    too-long-lines))))
         (setq line-number (1+ line-number))
         (forward-line 1))
       too-long-lines)))
